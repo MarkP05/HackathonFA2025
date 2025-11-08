@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QLabel, QTextEdit, QPushButton, QMessageBox, QFrame
 )
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QPixmap, QImage, QColor
 
 # --- Try importing Gemini SDK ---
 try:
@@ -33,6 +34,23 @@ if GEMINI_AVAILABLE:
         GEMINI_AVAILABLE = False
 
 
+def load_sprite_transparent(path, size=(150, 150)):
+    """Load an image and make magenta (255,0,255) transparent."""
+    pix = QPixmap(path)
+    img = pix.toImage().convertToFormat(QImage.Format_ARGB32)
+
+    for x in range(img.width()):
+        for y in range(img.height()):
+            color = img.pixelColor(x, y)
+            if color.red() == 255 and color.green() == 0 and color.blue() == 255:
+                color.setAlpha(0)
+                img.setPixelColor(x, y, color)
+
+    pix = QPixmap.fromImage(img)
+    pix = pix.scaled(size[0], size[1], Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    return pix
+
+
 class InsultJudge(QWidget):
     def __init__(self):
         super().__init__()
@@ -56,8 +74,7 @@ class InsultJudge(QWidget):
 
     def initUI(self):
         self.setWindowTitle("Ragebait Simulator")
-        self.setGeometry(00, 00, 1300, 900)
-
+        self.setGeometry(0, 0, 1300, 900)
 
         layout = QVBoxLayout()
 
@@ -66,29 +83,83 @@ class InsultJudge(QWidget):
         self.round_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.round_label)
 
-        # Player text boxes
+        # --- Player text boxes with referee in between ---
         h_layout = QHBoxLayout()
+
+        # Player 1 box
         self.player1_box = QTextEdit()
         self.player1_box.setPlaceholderText("Player 1: Type your insult here...")
         self.player1_box.setFixedWidth(300)
         self.player1_box.setFixedHeight(300)
 
+        # Player 2 box
         self.player2_box = QTextEdit()
         self.player2_box.setPlaceholderText("Player 2: Type your insult here...")
         self.player2_box.setFixedWidth(300)
         self.player2_box.setFixedHeight(300)
 
+        # Referee sprite
+        ref_pix = load_sprite_transparent(os.path.join("assets", "referee.png"), size=(200, 200))
+        self.referee_sprite = QLabel()
+        self.referee_sprite.setPixmap(ref_pix)
+        self.referee_sprite.setAlignment(Qt.AlignCenter)
+
+        # Winner label above referee as a speech bubble
+        self.winner_label = QLabel("")
+        self.winner_label.setAlignment(Qt.AlignCenter)
+        self.winner_label.setStyleSheet(
+            "background-color: #f5f5dc;"
+            "border: 2px solid #555;"
+            "border-radius: 15px;"
+            "padding: 10px;"
+            "font-size: 18px;"
+            "font-weight: bold;"
+            "color: darkblue;"
+        )
+        self.winner_label.setFixedWidth(180)
+        self.winner_label.setWordWrap(True)
+
+        # Referee layout (winner bubble + referee)
+        referee_layout = QVBoxLayout()
+        referee_layout.addWidget(self.winner_label)
+        referee_layout.addWidget(self.referee_sprite)
+        referee_layout.setAlignment(Qt.AlignCenter)
+
+        # Add widgets to h_layout with reduced spacing
         h_layout.addWidget(self.player1_box)
-        h_layout.addSpacing(80)  # gap between boxes
+        h_layout.addSpacing(20)
+        h_layout.addLayout(referee_layout)
+        h_layout.addSpacing(20)
         h_layout.addWidget(self.player2_box)
 
-
-        # Health bars below each text box
         layout.addLayout(h_layout)
-        # Health bars below each text box
+
+        # --- Player sprites above health bars ---
+        self.sprites_layout = QHBoxLayout()
+        self.sprites_layout.setSpacing(50)
+
+        # Player1 sprite
+        player1_pix = load_sprite_transparent(os.path.join("assets", "player1.png"), size=(180, 180))
+        self.player1_sprite = QLabel()
+        self.player1_sprite.setPixmap(player1_pix)
+        self.player1_sprite.setAlignment(Qt.AlignCenter)
+
+        # Player2 sprite
+        player2_pix = load_sprite_transparent(os.path.join("assets", "player2.png"), size=(180, 180))
+        self.player2_sprite = QLabel()
+        self.player2_sprite.setPixmap(player2_pix)
+        self.player2_sprite.setAlignment(Qt.AlignCenter)
+
+        self.sprites_layout.addWidget(self.player1_sprite)
+        self.sprites_layout.addSpacing(50)
+        self.sprites_layout.addWidget(self.player2_sprite)
+
+        layout.addLayout(self.sprites_layout)
+
+        # --- Health bars layout ---
         self.health_layout = QHBoxLayout()
-        layout.addSpacing(300)
-        
+        layout.addSpacing(20)
+
         # Player 1 red background
         self.p1_health_bar = QFrame()
         self.p1_health_bar.setFrameShape(QFrame.StyledPanel)
@@ -101,7 +172,6 @@ class InsultJudge(QWidget):
         self.p2_health_bar.setStyleSheet("background-color: red;")
         self.p2_health_bar.setFixedHeight(30)
 
-        # Add red bars to layout
         self.health_layout.addWidget(self.p1_health_bar)
         self.health_layout.addWidget(self.p2_health_bar)
         layout.addLayout(self.health_layout)
@@ -126,12 +196,9 @@ class InsultJudge(QWidget):
         layout.addWidget(self.result_label)
 
         self.setLayout(layout)
-
-        # Initial health display
         self.update_health_bars()
 
     def show_instructions(self):
-        """Display a popup explaining the game"""
         instructions = (
             "Welcome to Ragebait Simulator!\n\n"
             "Players take turns typing insults in their respective text boxes. "
@@ -142,7 +209,6 @@ class InsultJudge(QWidget):
         )
         QMessageBox.information(self, "Game Instructions", instructions)
 
-    # --- Event filter to catch red bar resizing ---
     def eventFilter(self, source, event):
         if event.type() == event.Resize:
             self.update_health_bars()
@@ -166,7 +232,6 @@ class InsultJudge(QWidget):
             QMessageBox.warning(self, "Error", "Both players must enter an insult!")
             return
 
-        # Call Gemini or use random fallback
         if GEMINI_AVAILABLE and api_key:
             try:
                 prompt = f"""
@@ -174,11 +239,6 @@ class InsultJudge(QWidget):
 
                 Rate each insult from 1–10 for wit, creativity, and humor.
                 Then decide which insult wins.
-                Don't let the users input profanity or vulgar language.
-                Be lenient and creative in your scoring, don't grade them in the eyes of an older person. 
-                This game will be played by college students, ages 18-22, so be mature and flexible with the results.
-                Don't make scores impossible to obtain, don't be stingy, but also don't hand out perfect tens unless the insult truly deserves it.
-
                 Return only valid JSON like:
                 {{
                     "player1_score": <number>,
@@ -205,23 +265,20 @@ class InsultJudge(QWidget):
             p1_score, p2_score = random.randint(1, 10), random.randint(1, 10)
             winner = "Player 1" if p1_score > p2_score else "Player 2"
 
-        # Subtract health based on score difference
+        # Update winner bubble above referee
+        self.winner_label.setText(f"{winner} wins!")
+
         diff = abs(p1_score - p2_score)
         if p1_score > p2_score:
             self.player2_health = max(0, self.player2_health - diff)
         else:
             self.player1_health = max(0, self.player1_health - diff)
 
-        # Update health bars
         self.update_health_bars()
 
-        # Display and record result
-        self.result_label.setText(
-            f"Player 1: {p1_score} | Player 2: {p2_score} → Winner: {winner}"
-        )
+        self.result_label.setText(f"Player 1: {p1_score} | Player 2: {p2_score}")
         self.save_results(insult1, insult2, p1_score, p2_score, winner)
 
-        # Check for game over
         if self.player1_health <= 0 or self.player2_health <= 0:
             game_winner = "Player 1" if self.player1_health > 0 else "Player 2"
             play_again = QMessageBox.question(
@@ -230,27 +287,22 @@ class InsultJudge(QWidget):
                 f"{game_winner} wins the game!\nDo you want to play again?",
                 QMessageBox.Yes | QMessageBox.No
             )
-
             if play_again == QMessageBox.Yes:
-                # Reset game
                 self.game_number += 1
                 self.player1_health = self.max_health
                 self.player2_health = self.max_health
                 self.round = 1
                 self.round_label.setText(f"Game {self.game_number} | Round {self.round}")
+                self.winner_label.setText("")
                 self.update_health_bars()
-
-                # Add new game header to results.txt
                 with open("results.txt", "a", encoding="utf-8") as f:
                     f.write(f"--- Game {self.game_number} ---\n")
             else:
                 QApplication.quit()
         else:
-            # Only increment round if the game is not over
             self.round += 1
             self.round_label.setText(f"Game {self.game_number} | Round {self.round}")
 
-        # Clear insult boxes
         self.player1_box.clear()
         self.player2_box.clear()
 
