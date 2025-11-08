@@ -40,20 +40,28 @@ class InsultJudge(QWidget):
         self.max_health = 10
         self.player1_health = self.max_health
         self.player2_health = self.max_health
+        self.game_number = 1
         self.initUI()
 
         # Event filter to handle red bar resizing
         self.p1_health_bar.installEventFilter(self)
         self.p2_health_bar.installEventFilter(self)
 
+        # Show game instructions popup
+        self.show_instructions()
+
+        # Start a new game by wiping results.txt
+        with open("results.txt", "w", encoding="utf-8") as f:
+            f.write(f"--- Game {self.game_number} ---\n")
+
     def initUI(self):
-        self.setWindowTitle("AI Insult Judge")
+        self.setWindowTitle("Ragebait Simulator")
         self.setGeometry(200, 200, 800, 500)
 
         layout = QVBoxLayout()
 
         # Round label
-        self.round_label = QLabel(f"Round {self.round}")
+        self.round_label = QLabel(f"Game {self.game_number} | Round {self.round}")
         self.round_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.round_label)
 
@@ -111,6 +119,18 @@ class InsultJudge(QWidget):
         # Initial health display
         self.update_health_bars()
 
+    def show_instructions(self):
+        """Display a popup explaining the game"""
+        instructions = (
+            "Welcome to Ragebait Simulator!\n\n"
+            "Players take turns typing insults in their respective text boxes. "
+            "The AI judge will score each insult based on creativity and humor. "
+            "The difference in scores will subtract health from the losing player. "
+            "First player to lose all health loses the game.\n\n"
+            "Good luck and have fun!"
+        )
+        QMessageBox.information(self, "Game Instructions", instructions)
+
     # --- Event filter to catch red bar resizing ---
     def eventFilter(self, source, event):
         if event.type() == event.Resize:
@@ -118,11 +138,9 @@ class InsultJudge(QWidget):
         return super().eventFilter(source, event)
 
     def update_health_bars(self):
-        # Get current width of the red bar (parent)
         p1_total_width = self.p1_health_bar.width()
         p2_total_width = self.p2_health_bar.width()
 
-        # Set green bar width as fraction of health
         p1_width = int((self.player1_health / self.max_health) * p1_total_width)
         p2_width = int((self.player2_health / self.max_health) * p2_total_width)
 
@@ -145,6 +163,10 @@ class InsultJudge(QWidget):
 
                 Rate each insult from 1–10 for wit, creativity, and humor.
                 Then decide which insult wins.
+                Don't let the users input profanity or vulgar language.
+                Be lenient and creative in your scoring, don't grade them in the eyes of an older person. 
+                This game will be played by college students, ages 18-22, so be mature and flexible with the results.
+                Don't make scores impossible to obtain, don't be stingy, but also don't hand out perfect tens unless the insult truly deserves it.
 
                 Return only valid JSON like:
                 {{
@@ -191,17 +213,33 @@ class InsultJudge(QWidget):
         # Check for game over
         if self.player1_health <= 0 or self.player2_health <= 0:
             game_winner = "Player 1" if self.player1_health > 0 else "Player 2"
-            QMessageBox.information(self, "Game Over", f"{game_winner} wins the game!")
-            # Reset health and round
-            self.player1_health = self.max_health
-            self.player2_health = self.max_health
-            self.round = 1
-            self.round_label.setText(f"Round {self.round}")
-            self.update_health_bars()
+            play_again = QMessageBox.question(
+                self,
+                "Game Over",
+                f"{game_winner} wins the game!\nDo you want to play again?",
+                QMessageBox.Yes | QMessageBox.No
+            )
 
-        # Prepare for next round
-        self.round += 1
-        self.round_label.setText(f"Round {self.round}")
+            if play_again == QMessageBox.Yes:
+                # Reset game
+                self.game_number += 1
+                self.player1_health = self.max_health
+                self.player2_health = self.max_health
+                self.round = 1
+                self.round_label.setText(f"Game {self.game_number} | Round {self.round}")
+                self.update_health_bars()
+
+                # Add new game header to results.txt
+                with open("results.txt", "a", encoding="utf-8") as f:
+                    f.write(f"--- Game {self.game_number} ---\n")
+            else:
+                QApplication.quit()
+        else:
+            # Only increment round if the game is not over
+            self.round += 1
+            self.round_label.setText(f"Game {self.game_number} | Round {self.round}")
+
+        # Clear insult boxes
         self.player1_box.clear()
         self.player2_box.clear()
 
