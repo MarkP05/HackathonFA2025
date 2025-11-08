@@ -239,7 +239,10 @@ class InsultJudge(QWidget):
 
                 Rate each insult from 1–10 for wit, creativity, and humor.
                 Then decide which insult wins.
-                Return only valid JSON like:
+                Don't let the users input profanity or vulgar language.
+                Be lenient and creative in your scoring, don't grade them in the eyes of an older person. 
+                This game will be played by college students, ages 18-22, so be mature and flexible with the results.
+                Don't make scores impossible to obtain, don't be stingy, but also don't hand out perfect tens unless the insult truly deserves it.
                 {{
                     "player1_score": <number>,
                     "player2_score": <number>,
