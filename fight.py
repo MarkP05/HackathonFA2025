@@ -40,43 +40,41 @@ class InsultJudge(QWidget):
         self.max_health = 10
         self.player1_health = self.max_health
         self.player2_health = self.max_health
-        self.game_number = 1
         self.initUI()
 
-        # Event filter to handle red bar resizing
-        self.p1_health_bar.installEventFilter(self)
-        self.p2_health_bar.installEventFilter(self)
-
-        # Show game instructions popup
-        self.show_instructions()
-
-        # Start a new game by wiping results.txt
-        with open("results.txt", "w", encoding="utf-8") as f:
-            f.write(f"--- Game {self.game_number} ---\n")
-
     def initUI(self):
-        self.setWindowTitle("Ragebait Simulator")
-        self.setGeometry(200, 200, 800, 500)
+        self.setWindowTitle("AI Insult Judge")
+        self.setGeometry(00, 00, 1300, 900)
 
         layout = QVBoxLayout()
 
         # Round label
-        self.round_label = QLabel(f"Game {self.game_number} | Round {self.round}")
+        self.round_label = QLabel(f"Round {self.round}")
         self.round_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.round_label)
 
         # Player text boxes
         h_layout = QHBoxLayout()
+
         self.player1_box = QTextEdit()
         self.player1_box.setPlaceholderText("Player 1: Type your insult here...")
+        self.player1_box.setFixedWidth(600)
+        self.player1_box.setFixedHeight(300)
+
         self.player2_box = QTextEdit()
         self.player2_box.setPlaceholderText("Player 2: Type your insult here...")
-        h_layout.addWidget(self.player1_box)
-        h_layout.addWidget(self.player2_box)
-        layout.addLayout(h_layout)
+        self.player2_box.setFixedWidth(600)
+        self.player2_box.setFixedHeight(300)
 
+        h_layout.addWidget(self.player1_box)
+        h_layout.addSpacing(80)  # gap between boxes
+        h_layout.addWidget(self.player2_box)
+
+        layout.addLayout(h_layout)
         # Health bars below each text box
         self.health_layout = QHBoxLayout()
+        layout.addSpacing(300)
+
 
         # Player 1 red background
         self.p1_health_bar = QFrame()
@@ -95,14 +93,15 @@ class InsultJudge(QWidget):
         self.health_layout.addWidget(self.p2_health_bar)
         layout.addLayout(self.health_layout)
 
-        # Foreground green bars (children of red bars)
+        # Foreground green bars (children of red bars) using manual geometry
         self.p1_health_fore = QFrame(self.p1_health_bar)
         self.p1_health_fore.setStyleSheet("background-color: green;")
-        self.p1_health_fore.setFixedHeight(30)
+        self.p1_health_fore.setGeometry(0, 0, self.p1_health_bar.width(), 30)
 
         self.p2_health_fore = QFrame(self.p2_health_bar)
         self.p2_health_fore.setStyleSheet("background-color: green;")
-        self.p2_health_fore.setFixedHeight(30)
+        self.p2_health_fore.setGeometry(0, 0, self.p2_health_bar.width(), 30)
+
 
         # Judge button
         self.judge_button = QPushButton("Judge!")
