@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QTextEdit, QPushButton, QMessageBox, QFrame
 )
-from PyQt5.QtCore import Qt, QPropertyAnimation, QRect
+from PyQt5.QtCore import Qt
 
 # --- Try importing Gemini SDK ---
 try:
@@ -41,6 +41,10 @@ class InsultJudge(QWidget):
         self.player1_health = self.max_health
         self.player2_health = self.max_health
         self.initUI()
+
+        # Event filter to handle red bar resizing
+        self.p1_health_bar.installEventFilter(self)
+        self.p2_health_bar.installEventFilter(self)
 
     def initUI(self):
         self.setWindowTitle("AI Insult Judge")
@@ -83,14 +87,14 @@ class InsultJudge(QWidget):
         self.health_layout.addWidget(self.p2_health_bar)
         layout.addLayout(self.health_layout)
 
-        # Foreground green bars (children of red bars) using manual geometry
+        # Foreground green bars (children of red bars)
         self.p1_health_fore = QFrame(self.p1_health_bar)
         self.p1_health_fore.setStyleSheet("background-color: green;")
-        self.p1_health_fore.setGeometry(0, 0, self.p1_health_bar.width(), 30)
+        self.p1_health_fore.setFixedHeight(30)
 
         self.p2_health_fore = QFrame(self.p2_health_bar)
         self.p2_health_fore.setStyleSheet("background-color: green;")
-        self.p2_health_fore.setGeometry(0, 0, self.p2_health_bar.width(), 30)
+        self.p2_health_fore.setFixedHeight(30)
 
         # Judge button
         self.judge_button = QPushButton("Judge!")
@@ -107,32 +111,23 @@ class InsultJudge(QWidget):
         # Initial health display
         self.update_health_bars()
 
+    # --- Event filter to catch red bar resizing ---
+    def eventFilter(self, source, event):
+        if event.type() == event.Resize:
+            self.update_health_bars()
+        return super().eventFilter(source, event)
+
     def update_health_bars(self):
-        # Get parent widths
+        # Get current width of the red bar (parent)
         p1_total_width = self.p1_health_bar.width()
         p2_total_width = self.p2_health_bar.width()
 
-        # Calculate new green bar widths
+        # Set green bar width as fraction of health
         p1_width = int((self.player1_health / self.max_health) * p1_total_width)
         p2_width = int((self.player2_health / self.max_health) * p2_total_width)
 
-        # Animate Player 1
-        anim1 = QPropertyAnimation(self.p1_health_fore, b"geometry")
-        anim1.setDuration(300)
-        anim1.setStartValue(self.p1_health_fore.geometry())
-        anim1.setEndValue(QRect(0, 0, p1_width, 30))
-        anim1.start()
-
-        # Animate Player 2
-        anim2 = QPropertyAnimation(self.p2_health_fore, b"geometry")
-        anim2.setDuration(300)
-        anim2.setStartValue(self.p2_health_fore.geometry())
-        anim2.setEndValue(QRect(0, 0, p2_width, 30))
-        anim2.start()
-
-        # Keep references so they aren't garbage collected
-        self._anim1 = anim1
-        self._anim2 = anim2
+        self.p1_health_fore.setFixedWidth(p1_width)
+        self.p2_health_fore.setFixedWidth(p2_width)
 
     def evaluate_insults(self):
         insult1 = self.player1_box.toPlainText().strip()
@@ -142,7 +137,7 @@ class InsultJudge(QWidget):
             QMessageBox.warning(self, "Error", "Both players must enter an insult!")
             return
 
-        # Call Gemini or fallback
+        # Call Gemini or use random fallback
         if GEMINI_AVAILABLE and api_key:
             try:
                 prompt = f"""
@@ -150,12 +145,8 @@ class InsultJudge(QWidget):
 
                 Rate each insult from 1–10 for wit, creativity, and humor.
                 Then decide which insult wins.
-                Don't let the users input profanity or vulgar language.
-                Be lenient and creative in your scoring, don't grade them in the eyes of an older person. 
-                This game will be played by college students, ages 18-22, so be mature and flexible with the results.
-                Don't make scores impossible to obtain, don't be stingy, but also don't hand out perfect tens unless the insult truly deserves it.
 
-                Return *only* valid JSON in this exact format:
+                Return only valid JSON like:
                 {{
                     "player1_score": <number>,
                     "player2_score": <number>,
@@ -181,19 +172,17 @@ class InsultJudge(QWidget):
             p1_score, p2_score = random.randint(1, 10), random.randint(1, 10)
             winner = "Player 1" if p1_score > p2_score else "Player 2"
 
-        # Subtract health
+        # Subtract health based on score difference
         diff = abs(p1_score - p2_score)
         if p1_score > p2_score:
-            self.player2_health -= diff
-            self.player2_health = max(self.player2_health, 0)
+            self.player2_health = max(0, self.player2_health - diff)
         else:
-            self.player1_health -= diff
-            self.player1_health = max(self.player1_health, 0)
+            self.player1_health = max(0, self.player1_health - diff)
 
         # Update health bars
         self.update_health_bars()
 
-        # Display result
+        # Display and record result
         self.result_label.setText(
             f"Player 1: {p1_score} | Player 2: {p2_score} → Winner: {winner}"
         )
@@ -203,14 +192,14 @@ class InsultJudge(QWidget):
         if self.player1_health <= 0 or self.player2_health <= 0:
             game_winner = "Player 1" if self.player1_health > 0 else "Player 2"
             QMessageBox.information(self, "Game Over", f"{game_winner} wins the game!")
-            # Reset
+            # Reset health and round
             self.player1_health = self.max_health
             self.player2_health = self.max_health
-            self.update_health_bars()
             self.round = 1
             self.round_label.setText(f"Round {self.round}")
+            self.update_health_bars()
 
-        # Next round
+        # Prepare for next round
         self.round += 1
         self.round_label.setText(f"Round {self.round}")
         self.player1_box.clear()
