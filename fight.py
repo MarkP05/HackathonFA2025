@@ -89,13 +89,13 @@ class InsultJudge(QWidget):
         # Player 1 box
         self.player1_box = QTextEdit()
         self.player1_box.setPlaceholderText("Player 1: Type your insult here...")
-        self.player1_box.setFixedWidth(300)
+        self.player1_box.setFixedWidth(600)
         self.player1_box.setFixedHeight(300)
 
         # Player 2 box
         self.player2_box = QTextEdit()
         self.player2_box.setPlaceholderText("Player 2: Type your insult here...")
-        self.player2_box.setFixedWidth(300)
+        self.player2_box.setFixedWidth(600)
         self.player2_box.setFixedHeight(300)
 
         # Referee sprite
