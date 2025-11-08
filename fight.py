@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QTextEdit, QPushButton, QMessageBox, QFrame
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPropertyAnimation, QRect
 
 # --- Try importing Gemini SDK ---
 try:
@@ -83,14 +83,14 @@ class InsultJudge(QWidget):
         self.health_layout.addWidget(self.p2_health_bar)
         layout.addLayout(self.health_layout)
 
-        # Foreground green bars (children of red bars)
+        # Foreground green bars (children of red bars) using manual geometry
         self.p1_health_fore = QFrame(self.p1_health_bar)
         self.p1_health_fore.setStyleSheet("background-color: green;")
-        self.p1_health_fore.setFixedHeight(30)
+        self.p1_health_fore.setGeometry(0, 0, self.p1_health_bar.width(), 30)
 
         self.p2_health_fore = QFrame(self.p2_health_bar)
         self.p2_health_fore.setStyleSheet("background-color: green;")
-        self.p2_health_fore.setFixedHeight(30)
+        self.p2_health_fore.setGeometry(0, 0, self.p2_health_bar.width(), 30)
 
         # Judge button
         self.judge_button = QPushButton("Judge!")
@@ -107,18 +107,32 @@ class InsultJudge(QWidget):
         # Initial health display
         self.update_health_bars()
 
-    # --- Fixed update_health_bars() as a proper class method ---
     def update_health_bars(self):
-        # Get current width of the red bar (parent)
+        # Get parent widths
         p1_total_width = self.p1_health_bar.width()
         p2_total_width = self.p2_health_bar.width()
 
-        # Set green bar width as fraction of health
+        # Calculate new green bar widths
         p1_width = int((self.player1_health / self.max_health) * p1_total_width)
         p2_width = int((self.player2_health / self.max_health) * p2_total_width)
 
-        self.p1_health_fore.setFixedWidth(p1_width)
-        self.p2_health_fore.setFixedWidth(p2_width)
+        # Animate Player 1
+        anim1 = QPropertyAnimation(self.p1_health_fore, b"geometry")
+        anim1.setDuration(300)
+        anim1.setStartValue(self.p1_health_fore.geometry())
+        anim1.setEndValue(QRect(0, 0, p1_width, 30))
+        anim1.start()
+
+        # Animate Player 2
+        anim2 = QPropertyAnimation(self.p2_health_fore, b"geometry")
+        anim2.setDuration(300)
+        anim2.setStartValue(self.p2_health_fore.geometry())
+        anim2.setEndValue(QRect(0, 0, p2_width, 30))
+        anim2.start()
+
+        # Keep references so they aren't garbage collected
+        self._anim1 = anim1
+        self._anim2 = anim2
 
     def evaluate_insults(self):
         insult1 = self.player1_box.toPlainText().strip()
@@ -128,7 +142,7 @@ class InsultJudge(QWidget):
             QMessageBox.warning(self, "Error", "Both players must enter an insult!")
             return
 
-        # Call Gemini or use random fallback
+        # Call Gemini or fallback
         if GEMINI_AVAILABLE and api_key:
             try:
                 prompt = f"""
@@ -167,21 +181,19 @@ class InsultJudge(QWidget):
             p1_score, p2_score = random.randint(1, 10), random.randint(1, 10)
             winner = "Player 1" if p1_score > p2_score else "Player 2"
 
-        # Subtract health based on score difference
+        # Subtract health
         diff = abs(p1_score - p2_score)
         if p1_score > p2_score:
             self.player2_health -= diff
-            if self.player2_health < 0:
-                self.player2_health = 0
+            self.player2_health = max(self.player2_health, 0)
         else:
             self.player1_health -= diff
-            if self.player1_health < 0:
-                self.player1_health = 0
+            self.player1_health = max(self.player1_health, 0)
 
         # Update health bars
         self.update_health_bars()
 
-        # Display and record result
+        # Display result
         self.result_label.setText(
             f"Player 1: {p1_score} | Player 2: {p2_score} → Winner: {winner}"
         )
@@ -191,14 +203,14 @@ class InsultJudge(QWidget):
         if self.player1_health <= 0 or self.player2_health <= 0:
             game_winner = "Player 1" if self.player1_health > 0 else "Player 2"
             QMessageBox.information(self, "Game Over", f"{game_winner} wins the game!")
-            # Reset health and round
+            # Reset
             self.player1_health = self.max_health
             self.player2_health = self.max_health
             self.update_health_bars()
             self.round = 1
             self.round_label.setText(f"Round {self.round}")
 
-        # Prepare for next round
+        # Next round
         self.round += 1
         self.round_label.setText(f"Round {self.round}")
         self.player1_box.clear()
