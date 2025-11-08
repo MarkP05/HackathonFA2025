@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
-# --- Optional Gemini import ---
+# --- Try importing Gemini SDK ---
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
@@ -16,7 +16,7 @@ except ImportError:
     GEMINI_AVAILABLE = False
     print("⚠️ google-generativeai not installed. Using random scores instead.")
 
-# --- Load API key if available ---
+# --- Load API Key ---
 api_key = None
 if GEMINI_AVAILABLE:
     try:
@@ -45,12 +45,12 @@ class InsultJudge(QWidget):
 
         layout = QVBoxLayout()
 
-        # --- Round label ---
+        # Round label
         self.round_label = QLabel(f"Round {self.round}")
         self.round_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.round_label)
 
-        # --- Player text boxes ---
+        # Player text boxes
         h_layout = QHBoxLayout()
         self.player1_box = QTextEdit()
         self.player1_box.setPlaceholderText("Player 1: Type your insult here...")
@@ -60,12 +60,12 @@ class InsultJudge(QWidget):
         h_layout.addWidget(self.player2_box)
         layout.addLayout(h_layout)
 
-        # --- Judge button ---
+        # Judge button
         self.judge_button = QPushButton("Judge!")
         self.judge_button.clicked.connect(self.evaluate_insults)
         layout.addWidget(self.judge_button)
 
-        # --- Result label ---
+        # Result label
         self.result_label = QLabel("")
         self.result_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.result_label)
@@ -84,20 +84,35 @@ class InsultJudge(QWidget):
         if GEMINI_AVAILABLE and api_key:
             try:
                 prompt = f"""
-                You are a judge in a humorous insult battle.
-                Rate each insult from 1 to 10 based on wit, creativity, and humor.
+                You are the judge in a fun, creative insult battle.
+
+                Rate each insult from 1–10 for wit, creativity, and humor.
+                Then decide which insult wins.
+
+                Return *only* valid JSON in this exact format:
+                {{
+                    "player1_score": <number>,
+                    "player2_score": <number>,
+                    "winner": "Player 1" or "Player 2"
+                }}
 
                 Player 1: "{insult1}"
                 Player 2: "{insult2}"
-
-                Return JSON only like this:
-                {{"player1_score": 7, "player2_score": 4, "winner": "Player 1"}}
                 """
+
                 response = model.generate_content(prompt)
-                data = json.loads(response.text)
-                p1_score = data.get("player1_score", 0)
-                p2_score = data.get("player2_score", 0)
+                text = response.text.strip()
+
+                # Clean possible markdown wrappers like ```json ... ```
+                if text.startswith("```"):
+                    text = text.strip("`").replace("json", "").strip()
+
+                # Try to parse
+                data = json.loads(text)
+                p1_score = int(data.get("player1_score", random.randint(1, 10)))
+                p2_score = int(data.get("player2_score", random.randint(1, 10)))
                 winner = data.get("winner", "Unknown")
+
             except Exception as e:
                 print(f"⚠️ Gemini error: {e}")
                 p1_score, p2_score = random.randint(1, 10), random.randint(1, 10)
